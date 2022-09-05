@@ -1,0 +1,1056 @@
+import com.atlassian.jira.issue.IssueManager;
+import com.atlassian.jira.issue.MutableIssue;
+import com.atlassian.jira.issue.link.IssueLink;
+import com.atlassian.jira.component.ComponentAccessor;
+
+IssueManager im = ComponentAccessor.getIssueManager()
+MutableIssue issue = im.getIssueObject("MF-167033")
+
+def changeHistoryManager = ComponentAccessor.getChangeHistoryManager()
+
+def output = ""
+def user = ""
+
+for (change in changeHistoryManager.getChangeHistories(issue)){
+    if (change.getChangeItems().oldstring[0] == 'В работе Л1' && change.getChangeItems().newstring[0] == 'Анализ Л2') {
+        output = output +  change.getAuthor() + ';' + change.getAuthorDisplayName() + ';'+ change.getChangeItems().oldstring[0] + ' -> ' + change.getChangeItems().newstring[0] + '<br/>'
+    }
+}
+return output
+-----------------------------------------------------------------------------------------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.issue.link.IssueLink
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def issueManager = ComponentAccessor.getIssueManager()
+def user = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+def changeHistoryManager = ComponentAccessor.getChangeHistoryManager()
+
+// edit this query to suit
+def query = jqlQueryParser.parseQuery("project = MF AND status changed from \"Open\" to \"Анализ БГ\" ")
+def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+def output = ""
+
+results.getIssues().each {documentIssue ->
+    MutableIssue issue = issueManager.getIssueObject(documentIssue.id)
+    def changehistoryItems = changeHistoryManager.getAllChangeItems(issue);
+    output = ""
+    def count = 0
+    def i_user = ""
+    output = output + issue.key + ' '
+    changehistoryItems.each{ historyItem ->
+        if (historyItem.field =="status") {
+            if (historyItem.getFroms().toString() == '{1=Open}' && historyItem.tos.toString() == "{10703=Анализ БГ}") {
+                i_user =  historyItem.getUserKey() + ' '
+                count++
+                //+ ' : ' + historyItem.froms.toString() + "->" + historyItem.tos.toString()
+            }
+        }
+    }
+    output = output + i_user + ' ' + count
+    log.warn(output)
+}
+
+-------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.issue.link.IssueLink
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+import java.text.SimpleDateFormat
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def issueManager = ComponentAccessor.getIssueManager()
+def user = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+def changeHistoryManager = ComponentAccessor.getChangeHistoryManager()
+
+// edit this query to suit
+def query = jqlQueryParser.parseQuery("project = MF AND status changed from \"В работе Л1\" to \"Анализ Л2\" "+
+                                      "during (\"2020-06-01\", \"2020-06-30\")")
+def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+def SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd hh:mm")
+
+def output = "Issue;User login;Count transition;Date<br/>"
+
+results.getIssues().each {documentIssue ->
+    MutableIssue issue = issueManager.getIssueObject(documentIssue.id)
+    def changehistoryItems = changeHistoryManager.getAllChangeItems(issue);
+    
+    def count = 0
+    def i_user = ""
+    def c_date = ""
+    
+    output = output + issue.key + ';'
+    changehistoryItems.each{ historyItem ->
+        def creationDate = formatter.format((Date)historyItem.created)
+        if (historyItem.field == "status") {
+            if (historyItem.getFroms().toString() == '{10101=В работе Л1}' && historyItem.tos.toString() == "{10300=Анализ Л2}") {
+                i_user =  historyItem.getUserKey() + ' '
+                c_date = creationDate + ' '
+                count++
+                //log.warn(historyItem.froms.toString() + "->" + historyItem.tos.toString())
+            }
+        }
+    }
+    output = output + i_user + ';' + count + ';' + c_date + "<br/>"
+}
+return output
+---------------------------------------------------------------------------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.issue.link.IssueLink
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+import java.text.SimpleDateFormat
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def issueManager = ComponentAccessor.getIssueManager()
+def user = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+def changeHistoryManager = ComponentAccessor.getChangeHistoryManager()
+
+def d_start = "2020-07-01"
+def d_end = "2020-07-30"
+
+// edit this query to suit
+def query = jqlQueryParser.parseQuery("project = MF AND status changed from \"В работе Л1\" to \"Анализ Л2\" "+
+                                      "during (\""+ d_start +"\", \""+ d_end +"\")")
+def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+def SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd")
+
+def output = "Issue;User login;User name;Date<br/>"
+
+results.getIssues().each {documentIssue ->
+    MutableIssue issue = issueManager.getIssueObject(documentIssue.id)
+    def changehistoryItems = changeHistoryManager.getAllChangeItems(issue);
+    
+    def i_user = ""
+    def c_date = ""
+    
+    //output = output + issue.key + ';'
+    for (change in changeHistoryManager.getChangeHistories(issue)){
+    	if (change.getChangeItems().oldstring[0] == 'В работе Л1' && change.getChangeItems().newstring[0] == 'Анализ Л2') {
+            if (formatter.format((Date)change.getTimePerformed()) > d_start && formatter.format((Date)change.getTimePerformed()) < d_end) {
+             	output = output + issue.key + ';' + change.getAuthor() + ';' + change.getAuthorDisplayName() + ';'+ formatter.format((Date)change.getTimePerformed()) + '<br/>'   
+            }
+    	}
+	}
+}
+return output
+
+----------------------------------------- Повысить приоритет -------------------------------------------------------
+// получить id приоритета задачи
+// уменьшить на 1
+// присвоить приоритет с новым id
+
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.config.ConstantsManager
+
+MutableIssue currentIssue = issue
+
+String issue_pr = currentIssue.priority.getId()
+Integer new_pr_id = 0
+
+if (issue_pr.toInteger() > 1 ) {
+    new_pr_id = issue_pr.toInteger() - 1
+    log.warn("ID current priority = " + new_pr_id.toString())
+    currentIssue.setPriorityId(new_pr_id.toString())
+    currentIssue.store()
+}
+--------------------------------------- Метки --------------------------------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.label.LabelManager
+
+//def labelManager = ComponentAccessor.getComponent(LabelManager)
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+
+def metkaOTP = customFieldManager.getCustomFieldObjectByName("Метка ОТП")
+//def issueLabels = labelManager.getLabels(issue.id, metkaOTP.getIdAsLong())
+def issueLabels = issue.getCustomFieldValue(metkaOTP)
+def select_kat_z = customFieldManager.getCustomFieldObjectByName("Категория заявки")
+def cfConfig = select_kat_z.getRelevantConfig(issue)
+
+def value = ComponentAccessor.optionsManager.getOptions(cfConfig)?.find {
+   	it.toString() == 'Инцидент'
+}
+//log.warn("!!! ВНИМАНИЕ !!! Метки : "+issue.getCustomFieldValue(metkaOTP))
+
+//Если ("Метка ОТП" не пустая) и ("Категория заявки" не "Инцидент") меняем "Категория заявки" на "Инцидент".
+if ((issueLabels.any { it.toString() != "" }) && (issue.getCustomFieldValue(select_kat_z) != value)) {
+    //log.warn("!!! ВНИМАНИЕ !!! Метка = "+issue.getCustomFieldValue(metkaOTP))
+    issue.setCustomFieldValue(select_kat_z, value)
+}
+//Если ("Метка ОТП" = "Консультация")  меняем "Категория заявки" на "Заявка на Консультацию".
+if (issueLabels.any { it.toString() == "Консультация" }) {
+    value = ComponentAccessor.optionsManager.getOptions(cfConfig)?.find {
+    	it.toString() == 'Заявка на Консультацию'
+	}
+    issue.setCustomFieldValue(select_kat_z, value)
+}
+--------------------------------------- Контакты Отвественного поле Create --------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.event.type.EventDispatchOption
+import com.atlassian.jira.user.ApplicationUser
+
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+def otv_po_zadache 	= customFieldManager.getCustomFieldObject("customfield_12420") //Ответственный по задаче
+def podsistema 		= customFieldManager.getCustomFieldObject("customfield_12415") //Подсистема
+def otv_contacts	= customFieldManager.getCustomFieldObject("customfield_12422") //Контакты ответственного
+
+def contact = ''
+
+if (otv_po_zadache.getValue(issue).toString() == "ОТР") {
+    contact = "Статинов Виктор (statinov.viktor@otr.ru +7-904-277-52-32), Крылов Андрей (krylov.andrei@otr.ru, +7-962-953-01-59)"
+}
+if (otv_po_zadache.getValue(issue).toString() == "МИНФИН") {
+    contact = "Телепко Михаил (Mikhail.Telepko@minfin.gov.ru)"
+}
+if (otv_po_zadache.getValue(issue).toString() == "РОСТЕЛЕКОМ") {
+    contact = "Рожнов Алексей (Alexey.Rozhnov@minfin.ru)"
+}
+if (otv_po_zadache.getValue(issue).toString() == "POSTGRES PRO") {
+    contact = "Попов Николай (n.popov@postgrespro.ru)"
+}
+if (otv_po_zadache.getValue(issue).toString() == "БАРС") {
+	def podsistemaVal = podsistema.getValue(issue)
+
+    if (podsistemaVal.toString().contains("УНП")) contact += "Станислав Забегаев (zabegaev@bars.group);"
+    if (podsistemaVal.toString().contains("БП")) contact += "Минханов Рамиль (r.minkhanov@bars.group);"
+    if (podsistemaVal.toString().contains("АЛЬФА")) contact += "Ирназаров Салават (s.irnazarov@bars.group);"
+    if (podsistemaVal.toString().contains("МФЗР")) contact += "Шахкеримов Артем (ashakhkerimov@bars.group);"
+}
+
+issue.setCustomFieldValue(otv_contacts, contact)
+
+// get logged in user
+ApplicationUser user = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser();
+ComponentAccessor.getIssueManager().updateIssue(user, issue, EventDispatchOption.ISSUE_UPDATED, false); 
+---------------------------------------------------------------------------------------
+Behaviour: Заполнение поля Ответственный
+import com.onresolve.jira.groovy.user.FormField
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.customfields.option.Option
+
+//Инициализация требуемых параметров
+
+def vliyanie = getFieldById("customfield_12421").getValue()
+def otvet = getFieldById("customfield_12413")
+
+def customField = ComponentAccessor.customFieldManager.getCustomFieldObject("customfield_12413")
+def config = customField.getRelevantConfig(getIssueContext())
+def options = ComponentAccessor.optionsManager.getOptions(config)
+def optionsMap = options.findAll {it.value in ["ОТР", "БАРС", "НСТ"]}
+.collectEntries {[(it.value) : it.optionId]}
+def valueList = new LinkedList()
+
+//Объявление полей и составление значений поля "Ответственный"
+if (vliyanie == "Работа пользователей")
+
+{ valueList.add(optionsMap.get("ОТР")) valueList.add(optionsMap.get("БАРС")) valueList.add(optionsMap.get("НСТ")) otvet.setFormValue(valueList) }
+
+else if (vliyanie == "ИС")
+
+{ valueList.add(optionsMap.get("ОТР")) valueList.add(optionsMap.get("БАРС")) otvet.setFormValue(valueList) }
+else if (vliyanie == "Инфраструктура")
+
+{ valueList.add(optionsMap.get("НСТ")) otvet.setFormValue(valueList) }
+else
+
+{ otvet.setFormValue(valueList) }
+//Проверки значения поля "Влияние" и подстановка значений поля "Ответственный"
+----------------------------  Selected Field (CASCADING) -------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.IssueManager
+import com.atlassian.jira.issue.fields.layout.field.FieldLayoutItem
+import com.atlassian.jira.issue.link.IssueLink
+import com.atlassian.jira.issue.link.IssueLinkManager
+import com.atlassian.jira.user.util.UserManager
+import com.atlassian.jira.user.ApplicationUser
+import com.atlassian.jira.event.type.EventDispatchOption
+import com.atlassian.jira.issue.customfields.option.Option
+import com.atlassian.jira.issue.customfields.impl.CascadingSelectCFType
+import com.atlassian.jira.issue.ModifiedValue
+import com.atlassian.jira.issue.util.DefaultIssueChangeHolder
+
+HashMap<String,String> tabSootv = [:]
+// CPM,UNPR
+tabSootv.put('Планирование','Паспорт проекта (национальный, федеральный, региональный)')
+tabSootv.put('Ключевые параметры','Паспорт проекта (национальный, федеральный, региональный)')
+tabSootv.put('Отчетность о ходе реализации','Отчетность проекта (национальный, федеральный, региональный)')
+tabSootv.put('Внесение изменений','Запрос на изменение проектов (национальный, федеральный, региональный)')
+tabSootv.put('Аналитическая отчетность','Модуль аналитической отчетности подсистемы управления национальными проектами')
+tabSootv.put('Все','Прочее')
+tabSootv.put('Мотивация','Прочее')
+
+IssueLinkManager issueLinkManager = ComponentAccessor.getIssueLinkManager()
+IssueManager issueManager = ComponentAccessor.getIssueManager()
+def userManager = (UserManager)  ComponentAccessor.getUserManager()
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+def issueService = ComponentAccessor.getIssueService()
+
+List issueLinks = issueLinkManager.getOutwardLinks(issue.getId()) // получаем связанные задачи
+IssueLink issueLink = issueLinks.get(0) // берем первую
+def issuelinkKey = issueLink.getDestinationObject().getKey().toString() // poluchaem klyuch zadachi
+def linkedIssue = issueManager.getIssueObject(issuelinkKey) // poluchaem obe`kt zadachi
+
+def BPField = customFieldManager.getCustomFieldObject("customfield_11914") // Бизнес-процесс
+def BPConfig = BPField.getRelevantConfig(linkedIssue) // config polya
+
+// ------ Poluchaem znachenie polya
+def BPFieldValue = issue.getCustomFieldValue(BPField)
+HashMap<String,Option> mapEntries = (HashMap<String,Option>) BPFieldValue
+
+if (mapEntries != null) {
+    Option parent = mapEntries.get(CascadingSelectCFType.PARENT_KEY)
+	Option child = mapEntries.get(CascadingSelectCFType.CHILD_KEY)
+    
+    def newValue = tabSootv.find{ it.key == parent.toString() }.value // ischem sootvetstvie
+    
+    FieldLayoutItem fieldLayoutItem = ComponentAccessor.getFieldLayoutManager().getFieldLayout(linkedIssue).getFieldLayoutItem(BPField) // ?
+	Option newParentOption = ComponentAccessor.optionsManager.getOptions(BPConfig).getOptionForValue(newValue, null) // znachenie polya vvide options
+	Option newChildOption = null
+	Map newValues = new HashMap() // massiv novih znachenii
+	Object existingValue = BPField.getValue(linkedIssue) // tekuschee znachenie
+
+	if(newParentOption != null) newValues.put(null, newParentOption)
+	if(newChildOption != null) newValues.put("1", newChildOption)
+	BPField.updateValue(fieldLayoutItem, linkedIssue, new ModifiedValue(existingValue, newValues), new DefaultIssueChangeHolder())  
+}
+
+// get logged in user
+ApplicationUser appUser = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser();
+ComponentAccessor.getIssueManager().updateIssue(appUser, linkedIssue, EventDispatchOption.ISSUE_UPDATED, false);
+
+----------------------------------- Set Assignee po Select cascading ----------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.fields.layout.field.FieldLayoutItem
+import com.atlassian.jira.user.util.UserManager
+import com.atlassian.jira.user.ApplicationUser
+import com.atlassian.jira.event.type.EventDispatchOption
+import com.atlassian.jira.issue.customfields.option.Option
+import com.atlassian.jira.issue.customfields.impl.CascadingSelectCFType
+import com.atlassian.jira.issue.ModifiedValue
+import com.atlassian.jira.issue.util.DefaultIssueChangeHolder
+
+HashMap<String,String> tabSootv = [:]
+// CPM,UNPR
+tabSootv.put('Планирование','Паспорт проекта (национальный, федеральный, региональный)')
+tabSootv.put('Ключевые параметры','Паспорт проекта (национальный, федеральный, региональный)')
+tabSootv.put('Отчетность о ходе реализации','Отчетность проекта (национальный, федеральный, региональный)')
+tabSootv.put('Внесение изменений','Запрос на изменение проектов (национальный, федеральный, региональный)')
+tabSootv.put('Аналитическая отчетность','Модуль аналитической отчетности подсистемы управления национальными проектами')
+tabSootv.put('Все','Прочее')
+tabSootv.put('Мотивация','Прочее')
+
+HashMap<String,String> tabSootvUser = [:]
+tabSootvUser.put('Паспорт проекта (национальный, федеральный, региональный)','bars_modenov')
+tabSootvUser.put('Отчетность проекта (национальный, федеральный, региональный)','bars_sibgatullina')
+tabSootvUser.put('Распределение результатов и показателей федерального проекта по субъектам Российской Федерации (соглашение между руководителем федерального проекта и руководителем регионального проекта)','bars_modenov')
+tabSootvUser.put('Распределение результатов и показателей регионального проекта по муниципальным образованиям','')
+tabSootvUser.put('Рабочий план федерального, регионального проекта','bars_koshelev')
+tabSootvUser.put('Предложение на изменение проекта (национальный, федеральный, региональный)','bars_zapivakhin')
+tabSootvUser.put('Запрос на изменение проектов (национальный, федеральный, региональный)','bars_zapivakhin')
+tabSootvUser.put('Модуль аналитической отчетности подсистемы управления национальными проектами','bars_adiyatullin')
+tabSootvUser.put('Вход и регистрация в подсистеме управления национальными проектами','bars_modenov')
+tabSootvUser.put('Информационное взаимодействие подсистемы управления национальными проектами с иными информациоными системами (региональными системами управления реализацией проектов)','bars_galkin')
+tabSootvUser.put('Прочее','bars_gabitova')
+
+def userManager = (UserManager) ComponentAccessor.getUserManager()
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+def issueService = ComponentAccessor.getIssueService()
+
+def BPField = customFieldManager.getCustomFieldObject("customfield_11914") // Бизнес-процесс
+def BPConfig = BPField.getRelevantConfig(issue) // config polya
+
+// ------ Poluchaem znachenie polya  -------
+def BPFieldValue = issue.getCustomFieldValue(BPField)
+HashMap<String,Option> mapEntries = (HashMap<String,Option>) BPFieldValue
+
+// ------- ustanavlivaem assignee  -------
+def needChange = true // Nuzhno menyat znachenie polya BP
+
+if (mapEntries != null) {
+    Option parent = mapEntries.get(CascadingSelectCFType.PARENT_KEY)
+	Option child = mapEntries.get(CascadingSelectCFType.CHILD_KEY)
+    
+    try {
+        def newValue = '' // tabSootv.find{ it.key == parent.toString() }.value // ischem sootvetstvie
+        
+        if (tabSootv.find{ it.key == parent.toString() } == null) { // null esli znachenie ne naideno, kogda issue sozdaetsya v UNPR
+            newValue = parent.toString()
+            needChange = false
+    	} else {
+            newValue = tabSootv.find{ it.key == parent.toString() }.value
+        }
+        
+        if (needChange) {
+            try {
+                FieldLayoutItem fieldLayoutItem = ComponentAccessor.getFieldLayoutManager().getFieldLayout(issue).getFieldLayoutItem(BPField) // ?
+                Option newParentOption = ComponentAccessor.optionsManager.getOptions(BPConfig).getOptionForValue(newValue, null) // znachenie polya vvide options
+                Option newChildOption = null
+                Map newValues = new HashMap() // massiv novih znachenii
+                Object existingValue = BPField.getValue(issue) // tekuschee znachenie
+
+                if(newParentOption != null) newValues.put(null, newParentOption)
+                if(newChildOption != null) newValues.put("1", newChildOption)
+                BPField.updateValue(fieldLayoutItem, issue, new ModifiedValue(existingValue, newValues), new DefaultIssueChangeHolder())
+            } catch(NullPointerException e) {
+                log.warn("Не удалось bpvtybnm значение в поле Бизнес-процесс ! Empty ! Skipping...")
+            } 
+        }
+        
+        try {
+            def newUser = tabSootvUser.find{ it.key == newValue }.value // ischem sootvetstvie
+            def user = userManager.getUserByName(newUser);
+            def validateAssignResult = issueService.validateAssign(user, issue.id, issue.reporterId)
+            issue.setAssignee(user)
+
+            // get logged in user
+            ApplicationUser appUser = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser();
+            ComponentAccessor.getIssueManager().updateIssue(appUser, issue, EventDispatchOption.ISSUE_UPDATED, false);
+        } catch(NullPointerException e) {
+            log.warn("Не удалось найти ответственного пользователя ! Empty ! Skipping...")
+        } 
+        
+    } catch(NullPointerException e) {
+        log.warn("Что-то пошло не так :( ! Нулевое значение. Skipping...")
+    }
+}
+--------------- Добавление в наблюдатели -------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+
+def project = ComponentAccessor.getCustomFieldManager().getCustomFieldObject("customfield_11607") // Проект сокращенно
+def watcherManager = ComponentAccessor.getWatcherManager()
+def userManager = ComponentAccessor.getUserManager()
+
+//log.warn('Pr_sokr:\''+issue.getCustomFieldValue(project)+'\'')
+
+if (issue.getCustomFieldValue(project).toString() == "БП") {
+    
+	def user = userManager.getUserByName("bars_minkhanov")
+
+    if (user) {
+        if (!watcherManager.isWatching(user, issue)) {
+        	watcherManager.startWatching(user, issue)
+        	log.warn('User : '+user+' добавлен в наблюдатели.')
+    	} else {
+        	log.warn('User : '+user+' уже добавлен в наблюдатели.')
+    	}
+    } else {
+        log.warn('Пользователь не заведен в системе !')
+    }
+}
+
+-------------------------------- Кол-во задач переведенных в статус -------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def commentManager = ComponentAccessor.getCommentManager()
+def issueManager = ComponentAccessor.getIssueManager()
+def user = ComponentAccessor.userManager.getUserByName('kochetkov.artem')
+
+def users = ['obukh.anastasiya','shutkina.uliana','abramova.anastasiia','lobova.kseniya','turkova.irina','bushueva.anastasiia','kaika.maxim','voronina.julia']
+def projects = ['SDOMS','SETD','SERMO']
+def issue_key_for_comment = 'ADMIN-2130'
+def issue = issueManager.getIssueObject(issue_key_for_comment)
+
+def d_start = '2021-08-06'
+def d_end = '2021-08-08'
+
+def issue_comment = "Статистика по пользователям c ${d_start} по ${d_end} :  \n\n"
+
+for (us in users) {
+    issue_comment += "${us} : \n"
+    for (project in projects) {
+    	def jql = "project = ${project} AND ('Исполнители 1 линии' = ${us} and status changed by ${us} TO 'Решено' DURING (${d_start}, ${d_end}) or status changed by ${us} TO 'В работе Л2' DURING (${d_start}, ${d_end}))"
+        //log.warn(jql)
+    	def query = jqlQueryParser.parseQuery(jql)
+		def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+		//log.warn("${us} - ${project} Total issues: ${results.total}")  
+        issue_comment += " - ${project} : ${results.total} \n"
+    }
+    issue_comment +="\n"
+}
+//log.warn(issue_comment)
+commentManager.create(issue,user,issue_comment,true)
+
+-------------------------------------------------- Замена значения в поле ---------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def issueManager = ComponentAccessor.getIssueManager()
+
+def user = ComponentAccessor.userManager.getUserByName('admin_support')
+def projects = ['EXPRMP','ADMIN','EXPDISP']
+def allTypeRabot = ['Управление лицензиями', 'Управление плагинами', 'Управление проектами (создание, удаление, модификация)', 'Рабочий стол, фильтры, гаджеты']
+def cfTypeRabot = ComponentAccessor.getCustomFieldManager().getCustomFieldObject("customfield_14018")
+
+for (project in projects) {
+    def jql = "project=${project} AND \"Тип работ\" in (\"Управление лицензиями\", \"Управление плагинами\", \"Управление проектами (создание, удаление, модификация)\", \"Рабочий стол, фильтры, гаджеты\")"
+    def query = jqlQueryParser.parseQuery(jql)
+	def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+    log.warn("${project} : ${results.total}")
+
+	results.getIssues().each { documentIssue ->
+        def issue = issueManager.getIssueObject(documentIssue.id)
+        def trValue = issue.getCustomFieldValue(cfTypeRabot)
+        log.warn("${issue.getKey()} - ${trValue}")
+        def trConfig = cfTypeRabot.getRelevantConfig(issue)
+        def newValue = ComponentAccessor.optionsManager.getOptions(trConfig)?.find {
+   			it.toString() == 'Администрирование Jira'
+		}
+        issue.setCustomFieldValue(cfTypeRabot, newValue)   
+	}
+}
+
+------------------------------------------------- Заполнение информации о пользователе по EMAIL -------------------------------------------
+import com.atlassian.jira.jql.builder.JqlQueryBuilder
+import com.atlassian.query.order.SortOrder
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.web.bean.PagerFilter
+import com.atlassian.jira.bc.issue.search.SearchService
+import com.atlassian.jira.event.type.EventDispatchOption
+import com.atlassian.jira.user.UserUtils
+
+def cfManager = ComponentAccessor.getCustomFieldManager()
+def cfEmail = cfManager.getCustomFieldObject(12406L)
+def cfPhone = cfManager.getCustomFieldObject(12407L)
+def cfPosition = cfManager.getCustomFieldObject(12700L)
+def cfDepartment = cfManager.getCustomFieldObject(14003L)
+def cfCabinet = cfManager.getCustomFieldObject(14004L)
+def cfFio = cfManager.getCustomFieldObject(10104L)
+//def emailValue = cfEmail.getValueFromIssue(issue)
+def fioValue = cfFio.getValueFromIssue(issue)
+def reporterEmail = issue.getReporter().getEmailAddress()
+
+log.warn "emailCreator = ${reporterEmail}"
+log.warn "fio = ${fioValue}"
+if (fioValue != null) {
+    return
+}
+def builder = JqlQueryBuilder.newBuilder()
+def whereBuilder = builder.where().defaultAnd()
+whereBuilder.project(11400L)
+           	.customField(10104L).isNotEmpty()
+      		.customField(12406L).like(reporterEmail)
+builder.orderBy().createdDate(SortOrder.DESC)
+def query = builder.buildQuery()
+
+def orderedResults = ComponentAccessor.getComponentOfType(SearchService.class).search(UserUtils.getUser("admin_support"), query, PagerFilter.getUnlimitedFilter()).getIssues()
+Map<String, String> personContacts = new LinkedHashMap<>()
+for (i in orderedResults) {
+   def cfFioValue = cfFio.getValueFromIssue(i)
+   def cfEmailValue = cfEmail.getValueFromIssue(i)
+   if (!reporterEmail.equals(cfEmailValue)) {
+       continue
+   }
+   def cfPhoneValue = cfPhone.getValueFromIssue(i)
+   def cfPositionValue = cfPosition.getValueFromIssue(i)
+   def cfDepartmentValue = cfDepartment.getValueFromIssue(i)
+   def cfCabinetValue = cfCabinet.getValueFromIssue(i)
+   if(!personContacts.containsKey("fio") && cfFioValue != null && !cfFioValue.isEmpty()){
+      personContacts.put("fio", cfFioValue)
+   }
+//   if(!personContacts.containsKey("email") && cfEmailValue != null && !cfEmailValue.isEmpty()){
+//      	personContacts.put("email", cfEmailValue)
+//   }
+   if(!personContacts.containsKey("phone") && cfPhoneValue != null && !cfPhoneValue.isEmpty()){
+       personContacts.put("phone", cfPhoneValue)
+   }
+   if(!personContacts.containsKey("position") && cfPositionValue != null && !cfPositionValue.isEmpty()){
+      personContacts.put("position", cfPositionValue)
+   }
+   if(!personContacts.containsKey("departament") && cfDepartmentValue != null && !cfDepartmentValue.isEmpty()){
+      personContacts.put("departament", cfDepartmentValue)
+   }
+   if(!personContacts.containsKey("cabinet") && cfCabinetValue != null && !cfCabinetValue.isEmpty()){
+      personContacts.put("cabinet", cfCabinetValue)
+   }
+   boolean completeData = personContacts.containsKey("phone") && personContacts.containsKey("position") && personContacts.containsKey("departament") && personContacts.containsKey("cabinet") && personContacts.containsKey("fio")
+   if(completeData){
+      break
+   }
+}
+log.warn "personContacts =${personContacts.get("fio")}"
+if(personContacts.get("phone") != null){
+   issue.setCustomFieldValue(cfPhone, personContacts.get("phone"))
+}
+if(personContacts.get("fio") != null){
+   issue.setCustomFieldValue(cfFio, personContacts.get("fio"))
+}
+if(personContacts.get("position") != null){
+   issue.setCustomFieldValue(cfPosition, personContacts.get("position"))
+}
+if(personContacts.get("departament") != null){
+   issue.setCustomFieldValue(cfDepartment, personContacts.get("departament"))
+}
+if(personContacts.get("cabinet") != null){
+   issue.setCustomFieldValue(cfCabinet, personContacts.get("cabinet"))
+}
+ComponentAccessor.getIssueManager().updateIssue(UserUtils.getUser("admin_support"), issue, EventDispatchOption.ISSUE_UPDATED, false)
+------------------------------------------------------------ Автоназначение исполнителя ---------------------------------------------------------
+import static com.atlassian.jira.issue.IssueFieldConstants.ASSIGNEE
+
+def trFieldValue = getFieldById(getFieldChanged()).getValue() as String
+
+if (trFieldValue == "Администрирование Jira") {
+    // set Assignee
+	getFieldById(ASSIGNEE).setFormValue("foms_admin_jira")
+}
+------------------------------------------------------- Среднеей значение полей -----------------------------------------------------------
+def f1 = getFieldById("customfield_14417")
+f1.setRequired(true)
+f1.setReadOnly(false)
+def f2 = getFieldById("customfield_14418")
+f2.setRequired(true)
+f2.setReadOnly(true)
+def f3 = getFieldById("customfield_14419")
+f3.setRequired(true)
+f3.setReadOnly(true)
+def f4 = getFieldById("customfield_14420")
+f4.setRequired(true)
+f4.setReadOnly(true)
+def f5 = getFieldById("customfield_14421")
+f5.setRequired(true)
+f5.setReadOnly(true)
+def f6 = getFieldById("customfield_14422")
+f6.setRequired(true)
+f6.setReadOnly(true)
+def f7 = getFieldById("customfield_14423")
+f7.setRequired(true)
+f7.setReadOnly(true)
+def f8 = getFieldById("customfield_14424")
+f8.setRequired(true)
+f8.setReadOnly(true)
+def sredZnField = getFieldById("customfield_14425")
+sredZnField.setRequired(true)
+sredZnField.setReadOnly(true)
+
+def f1 = getFieldById("customfield_14417")
+def f2 = getFieldById("customfield_14418")
+def f3 = getFieldById("customfield_14419")
+def f4 = getFieldById("customfield_14420")
+def f5 = getFieldById("customfield_14421")
+def f6 = getFieldById("customfield_14422")
+def f7 = getFieldById("customfield_14423")
+def f8 = getFieldById("customfield_14424")
+def sredZnField = getFieldById("customfield_14425")
+
+def srZn = ((f1.getValue() as Integer) + (f2.getValue() as Integer) + (f3.getValue() as Integer) + (f4.getValue() as Integer) + (f5.getValue() as Integer) + (f6.getValue() as Integer) + (f7.getValue() as Integer) + (f8.getValue() as Integer))/8 as Float
+sredZnField.setFormValue(srZn) 
+
+
+def srZn = ((f1.getValue() as Integer) + (f2.getValue() as Integer) + (f3.getValue() as Integer) + (f4.getValue() as Integer) + (f5.getValue() as Integer) + (f6.getValue() as Integer) + (f7.getValue() as Integer) + (f8.getValue() as Integer))/8 as Float
+sredZnField.setFormValue(srZn) 
+
+
+def f1 = getFieldById("customfield_14417")
+def f2 = getFieldById("customfield_14418")
+
+if ((f1?.value as Integer) > 0) {
+    f2.setReadOnly(false)
+    def sredZnField = getFieldById("customfield_14425")
+    sredZnField.setFormValue(getFieldById("customfield_14417").getValue()) 
+} else {
+    f2.setReadOnly(true)
+    def sredZnField = getFieldById("customfield_14425")
+    sredZnField.setFormValue('"' + getFieldById("customfield_14417").getValue()+'"') 
+}
+--------------------------------------- Set Assignee -----------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.search.SearchProvider
+import com.atlassian.jira.jql.parser.JqlQueryParser
+import com.atlassian.jira.web.bean.PagerFilter
+
+def jqlQueryParser = ComponentAccessor.getComponent(JqlQueryParser)
+def searchProvider = ComponentAccessor.getComponent(SearchProvider)
+def issueManager = ComponentAccessor.getIssueManager()
+
+def user = ComponentAccessor.userManager.getUserByName('admin_support')
+
+def jql = "project in (ADMIN, EXPDISP, EXPRMP) AND assignee is EMPTY"
+def query = jqlQueryParser.parseQuery(jql)
+def results = searchProvider.search(query, user, PagerFilter.getUnlimitedFilter())
+
+log.warn "Кол-во задач : ${results.total}"
+
+results.getIssues().each { documentIssue ->
+	def issue = issueManager.getIssueObject(documentIssue.id)
+    log.warn "${issue} -> Assignie ${issue.}"
+}
+-------------------------------------- Time in Status --------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.index.IssueIndexManager
+import com.atlassian.jira.issue.changehistory.ChangeHistoryManager
+
+def project_list = ["SDOMS", "SERMO", "SETD"]
+def status_list = ["В работе Л1", "В работе Л2"]
+
+def issueIndexManager = ComponentAccessor.getComponent(IssueIndexManager)
+
+ChangeHistoryManager changeHistoryManager = ComponentAccessor.getChangeHistoryManager()
+
+if (issue.getProjectObject().getKey() in project_list) {
+	if (issue.getStatus().name in status_list ) {
+        Date inStatusDate = changeHistoryManager.getChangeItemsForField(issue, "status").findAll{
+            it.toString == issue.getStatus().name
+        }.last().getCreated()
+		return ((new Date().time - inStatusDate.time) / 1000) as Long
+	}
+}
+------------------------------ Progress Bar ----------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor;
+import com.atlassian.jira.issue.CustomFieldManager;
+import com.atlassian.jira.issue.fields.CustomField;
+import com.atlassian.jira.issue.IssueManager;
+import com.atlassian.jira.issue.Issue;
+ 
+// get CustomFieldManager instance
+def customFieldManager = ComponentAccessor.getCustomFieldManager()
+
+// find your SLA Overview field's ID and put it here instead of 10801
+def overviewField = customFieldManager.getCustomFieldObject("customfield_13702")
+def overviewFieldValue = issue.getCustomFieldValue(overviewField)
+
+int percentSLA = 0L
+
+// SLA Overview field returns list
+if (overviewFieldValue) {
+    // if there is overdue, then all details of overdues are in 'overdues' attribute
+        overviewFieldValue.each {
+            int slaValueAsSeconds = it.slaValueAsMinutes * 60
+            long workingDurationAsSeconds = it.workingDurationAsSeconds
+            // log.warn("slaValue = "+slaValueAsSeconds.toString())
+            // log.warn("wd = "+workingDurationAsSeconds.toString())
+            percentSLA = ((workingDurationAsSeconds * 100) / slaValueAsSeconds).round(0)
+            // log.warn("percent = "+percentSLA.toString())
+        }
+}
+
+def color = ''
+
+if (percentSLA < 50) color = "green"
+if ((percentSLA >= 50) & (percentSLA < 75)) color = "orange"
+if (percentSLA >= 75) color = "red"
+
+def progress = "<progress style=\"vertical-align:middle; max-width: 60%; color: ${color};\" value=\"${percentSLA.toString()}\" min=\"0\" max=\"100\">${percentSLA.toString()} %</progress>"
+def spanProgression = " <span>${percentSLA.toString()} %</span>";
+  
+return "<div><meter low=\"50\" high=\"75\" max=\"100\" optimum=\"0\" value=\"51\">${percentSLA.toString()}</meter>${spanProgression}</div>"
+// return "<div>" + progress + " " + spanProgression + "</div>";
+// return "<font style ='color: ${color}; font-weight: 700;'>${percentSLA.toString()}</font>"
+--------------------------------------------------------------------- Listener -----------------------------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor;
+import com.atlassian.jira.issue.CustomFieldManager;
+import com.atlassian.jira.issue.fields.CustomField;
+import com.atlassian.jira.issue.IssueManager;
+import com.atlassian.jira.issue.Issue;
+
+def currentUser = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+
+def cfMgr = ComponentAccessor.getCustomFieldManager()
+def lwdCf = cfMgr.getCustomFieldObject('customfield_14806') // Last Working Duration
+
+def issueMgr = ComponentAccessor.getIssueManager()
+def issue = issueMgr.getIssueObject(event.issue.key)
+
+def overviewField = cfMgr.getCustomFieldObject("customfield_13702")
+def overviewFieldValue = issue.getCustomFieldValue(overviewField)
+
+Long workingDurationAsTimeInt = 0L
+// SLA Overview field returns list
+if (overviewFieldValue) {
+    // if there is overdue, then all details of overdues are in 'overdues' attribute
+        overviewFieldValue.each {
+            workingDurationAsTimeInt = it.workingDurationAsSeconds
+        }
+}
+
+if ((issue.getStatus().name.equals("В работе Л1")) || (issue.getStatus().name.equals("В работе Л2"))) {
+	issue.setCustomFieldValue(lwdCf,workingDurationAsTimeInt)
+    log.warn("Время решения : "+workingDurationAsTimeInt.toString())
+}
+----------------------------------------------------- Update fields ----------------------------------------------------------------
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.event.type.EventDispatchOption
+import java.sql.Date
+import com.atlassian.jira.issue.customfields.option.Option
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.issue.fields.CustomField
+import com.atlassian.jira.issue.label.Label
+import com.atlassian.jira.bc.user.search.UserSearchService
+import com.atlassian.jira.bc.user.search.UserSearchParams
+import com.atlassian.jira.user.ApplicationUser
+
+
+def issue = ComponentAccessor.getIssueManager().getIssueByCurrentKey("BP-7")
+def user = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+
+// Получаем ссылки на кастомные поля
+def singleline_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("singleline_field")
+def datetimepicker_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("datetimepicker_field")
+def checkbox_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("checkbox_field")
+def number_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("number_field")
+def labels_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("labels_field")
+def multi_grouppicker_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("multi_grouppicker_field")
+def multiline_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("multiline_field")
+def datepicker_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("datepicker_field")
+def userpicker_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("userpicker_field")
+def radiobuttons_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("radiobuttons_field")
+def selectlist_cascading_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("selectlist_cascading_field")
+def select_singlechoice_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("select_singlechoice_field")
+def selectlist_multichoice_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("selectlist_multichoice_field")
+def url_field = ComponentAccessor.getCustomFieldManager().getCustomFieldObjectByName("url_field")
+
+// устанавливаем значения полей
+issue.setCustomFieldValue(singleline_field, "test 1")
+issue.setCustomFieldValue(datetimepicker_field, new Date(Calendar.getInstance().getTime().getTime())) 
+issue.setCustomFieldValue(checkbox_field, getOptions(issue, checkbox_field, ["option 1", "option 2"])) 
+issue.setCustomFieldValue(number_field, (Double) 1) 
+issue.setCustomFieldValue(labels_field, [new Label(null, issue.getId(), labels_field.getIdAsLong(), "Label")] as Set) 
+issue.setCustomFieldValue(multi_grouppicker_field, [ComponentAccessor.getGroupManager().getGroup("jira-software-users")])
+issue.setCustomFieldValue(multiline_field, "test 1") 
+issue.setCustomFieldValue(datepicker_field, new Date(Calendar.getInstance().getTime().getTime())) 
+issue.setCustomFieldValue(userpicker_field, findUser("admin")) 
+issue.setCustomFieldValue(radiobuttons_field, getOptions(issue, checkbox_field, ["option 1"]).get(0)) 
+issue.setCustomFieldValue(selectlist_cascading_field, getCascadingOptions(issue, selectlist_cascading_field)) 
+issue.setCustomFieldValue(select_singlechoice_field,  getOptions(issue, select_singlechoice_field, ["option 1"]).get(0)) 
+issue.setCustomFieldValue(selectlist_multichoice_field, getOptions(issue, selectlist_multichoice_field, ["option 1", "option 2"])) 
+issue.setCustomFieldValue(url_field, "http://google.com") 
+
+// применяем изменения
+ComponentAccessor.getIssueManager().updateIssue(user, issue, EventDispatchOption.ISSUE_UPDATED, false)
+
+// получем опции для  кастомных полей типа radio button, checkbox and select
+def List<Option> getOptions(Issue issue, CustomField customField, List<String> optionList) {
+    def config = customField.getRelevantConfig(issue)
+    def options = ComponentAccessor.getOptionsManager().getOptions(config)
+    def optionsToSelect = options.findAll { it.value in optionList } 
+}
+
+// получаем пользователя для кастомного поля типа user picker 
+def ApplicationUser findUser(String userName) {
+   def userSearchService = ComponentAccessor.getComponent(UserSearchService.class);
+   UserSearchParams userSearchParams = (new UserSearchParams.Builder()).allowEmptyQuery(true).includeActive(true).includeInactive(true).maxResults(100000).build();
+
+   return userSearchService.findUsers(userName, userSearchParams).get(0)
+
+}
+
+// получаем опции для кастомного поля типа cascading select
+def Map<String, Object> getCascadingOptions(Issue issue, CustomField customField) {
+    def parentOptionObj = getOptions(issue, customField, ["option 1"]).get(0) as Option
+    def childOptionObj = ComponentAccessor.getOptionsManager().findByParentId(parentOptionObj.getOptionId()).get(0)
+    Map<String,Object> newValues = new HashMap<>()
+    newValues.put(null, parentOptionObj)
+    newValues.put("1", childOptionObj)
+    return newValues
+}
+
+------------------------------------------------- Listener -------------------------------------------------------
+# Copy cuurent value in Field on transition
+
+import com.atlassian.jira.component.ComponentAccessor;
+import com.atlassian.jira.issue.CustomFieldManager;
+import com.atlassian.jira.issue.fields.CustomField;
+import com.atlassian.jira.issue.IssueManager;
+import com.atlassian.jira.issue.Issue;
+import com.atlassian.jira.user.UserUtils;
+import com.atlassian.jira.event.type.EventDispatchOption;
+
+def currentUser = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser()
+
+def cfMgr = ComponentAccessor.getCustomFieldManager()
+def lwdCf = cfMgr.getCustomFieldObject('customfield_14807') // Last Working Duration
+
+def issueMgr = ComponentAccessor.getIssueManager()
+def issue = issueMgr.getIssueObject(event.issue.key)
+
+def overviewField = cfMgr.getCustomFieldObject("customfield_13702")
+def overviewFieldValue = issue.getCustomFieldValue(overviewField)
+
+long workingDurationAsTimeInt = -1
+
+if ((issue.getStatus().name.equals("В работе Л1")) || (issue.getStatus().name.equals("В работе Л2"))) {
+    // SLA Overview field returns list
+    if (overviewFieldValue) {
+            overviewFieldValue.each {
+                workingDurationAsTimeInt = it.workingDurationAsSeconds
+            }
+    }
+    
+    if (workingDurationAsTimeInt != -1) {
+		issue.setCustomFieldValue(lwdCf, workingDurationAsTimeInt.toString())
+    	// log.warn("Время решения : "+workingDurationAsTimeInt.toString())
+    	issueMgr.updateIssue(UserUtils.getUser("admin_support"), issue, EventDispatchOption.ISSUE_UPDATED, false)   
+    }
+}
+
+------------------------------------------------- ScriptRunner Job -----------------------------------------------
+## Transition and update issue
+
+import com.atlassian.jira.bc.issue.search.SearchService
+import com.atlassian.jira.component.ComponentAccessor
+import com.atlassian.jira.issue.search.SearchException
+import com.atlassian.jira.web.bean.PagerFilter
+import com.atlassian.jira.issue.Issue
+import com.atlassian.jira.issue.MutableIssue
+import com.atlassian.jira.user.ApplicationUser
+import com.atlassian.jira.bc.issue.IssueService
+import com.opensymphony.workflow.loader.ActionDescriptor
+import com.atlassian.jira.issue.fields.CustomField
+import com.atlassian.jira.issue.customfields.option.Option
+import com.atlassian.jira.event.type.EventDispatchOption
+import java.time.LocalDateTime
+import org.apache.log4j.Level
+
+// Set log level to INFO
+log.setLevel(Level.INFO)
+
+// The JQL query you want to search with
+final jqlSearch = "project in (SDOMS,SERMO,SETD) and slaFunction = isInBusinessHours() and " +
+    "status in (\"В работе Л1\", \"В работе Л2\") and " +
+    "assignee in (\"Л1 ОТР\", \"Л2 ОТР\")"
+
+final actionName = "Отложить (Auto)"
+
+// Some components
+def user = ComponentAccessor.jiraAuthenticationContext.loggedInUser
+def searchService = ComponentAccessor.getComponentOfType(SearchService)
+def issueService = ComponentAccessor.issueService
+def workflowManager = ComponentAccessor.workflowManager
+
+
+def cfMgr = ComponentAccessor.getCustomFieldManager()
+def prWait = cfMgr.getCustomFieldObject('customfield_13815')   // Причина ожидания Required value=13526
+def poyasnL1 = cfMgr.getCustomFieldObject('customfield_13800') // Пояснение Л1 Required
+
+def overTime = [
+    'Инцидент-Highest': 2,
+    'Инцидент-High': 4,
+    'Запрос консультации-Highest': 6,
+    'Запрос консультации-High': 6,
+    "Запрос консультации-Medium": 6,
+    "Инцидент-Medium": 6,
+    "Запрос консультации-Low": 10,
+    "Инцидент-Low": 10,
+    "Запрос на обслуживание-Medium": 10
+]
+
+// Parse the query
+def parseResult = searchService.parseQuery(user, jqlSearch)
+if (!parseResult.valid) {
+    log.error('Invalid query')
+    return null
+}
+
+boolean checkWorkingDuration(Issue issue, overTime) {
+    def cfMgr = ComponentAccessor.getCustomFieldManager()
+    def overviewField = cfMgr.getCustomFieldObject("customfield_13702")
+	def lwdCf = cfMgr.getCustomFieldObject('customfield_14807') // Last Working Duration
+    
+    if ((issue.getCustomFieldValue(lwdCf) != null) || (overTime != null))  {
+        long lastWD = (long) Long.parseLong(issue.getCustomFieldValue(lwdCf), 10)
+        long curWD = (long) issue.getCustomFieldValue(overviewField).workingDurationAsSeconds[0]
+        
+        if (lastWD < curWD - ((int) overTime * 3600)) {
+            //log.warn("${issue.key} :: True :: ${lastWD}->${curWD} - ${overTime * 3600}")
+            return true
+        } else {
+            //log.warn("${issue.key} :: False :: ${lastWD}->${curWD} - ${overTime * 3600}")
+            return false
+        }
+    } else {
+        return false
+    }
+}
+
+def issueTransition(Issue issue, String actionName, ApplicationUser currentUser) {
+    def issueManager = ComponentAccessor.issueManager
+    def issueService = ComponentAccessor.issueService
+    
+    def issueInputParameters = issueService.newIssueInputParameters()
+    
+    final action = getAction(actionName, issue)
+    
+    try {
+        if (!action) {
+            throw new RuntimeException("Action '$actionName' Not Found")
+        }
+    
+    	def validateTransition = issueService.validateTransition(currentUser, issue.id, action.id, issueInputParameters)
+        
+        if (validateTransition.valid) {
+            issueService.transition(currentUser, validateTransition)
+            return true
+        } else {
+            return false
+        }
+    } catch (RuntimeException e) {
+    	e.printStackTrace()
+        return false
+    }
+}
+
+ActionDescriptor getAction(String actionName, Issue issue) {
+    def workflowManager = ComponentAccessor.workflowManager.getWorkflow(issue)
+    def actions = workflowManager.getActionsByName(actionName)
+    actions.find { action -> action.name == actionName }
+}
+
+def List<Option> getOptions(Issue issue, CustomField customField, List<String> optionList) {
+    def config = customField.getRelevantConfig(issue)
+    def options = ComponentAccessor.getOptionsManager().getOptions(config)
+    def optionsToSelect = options.findAll { it.value in optionList } 
+}
+
+try {
+    // Perform the query to get the issues
+    def res = "Выполнено задание в ${LocalDateTime.now()}"
+    def results = searchService.search(user, parseResult.query, PagerFilter.unlimitedFilter)
+    def issues = results.results
+    
+    issues.each {
+        MutableIssue issue = ComponentAccessor.getIssueManager().getIssueByCurrentKey(it.key)
+        def time = overTime["${issue.issueType.name}-${issue.priority.name}"]
+        
+        if (checkWorkingDuration(issue, time)) {
+            if (issueTransition(issue, actionName, user)) {
+                // Устанавливаем значение поля "причина ожидания"
+                issue.setCustomFieldValue(prWait,  getOptions(issue, prWait, ['Диагностика инцидента']).get(0))
+            	//issue.setCustomFieldValue(poyasnL1, "test")
+                // сохраняем изменения
+				ComponentAccessor.getIssueManager().updateIssue(user, issue, EventDispatchOption.ISSUE_UPDATED, false)
+                log.warn("[ScriptRunner by ArtemK] Issue ${issue.key} transitioned.")
+            } else {
+                log.warn("${issue.key} not transitioned.")
+        	}
+        } else {
+            log.warn("Что-то пошло не так !")
+        }
+    }
+    //issues*.key
+    return res
+} catch (SearchException e) {
+    e.printStackTrace()
+    null
+}
